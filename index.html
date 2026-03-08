@@ -51,11 +51,6 @@
     </main>
     <script>
         let activeVehicle = null;
-        // Replace with your actual credentials from IdentityPass (signup at https://developer.myidentitypass.com/)
-        const API_URL = 'https://api.myidentitypay.com/api/v2/biometrics/merchant/data/verification/vehicle';
-        const APP_ID = 'YOUR_APP_ID_HERE';
-        const API_KEY = 'YOUR_API_KEY_HERE';
-
         async function performLookup() {
             const rawInput = document.getElementById('plateNumber').value.trim();
             const plateNo = rawInput.toUpperCase().replace(/[-\s]/g, "");
@@ -75,24 +70,56 @@
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
             try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'app-id': APP_ID,
-                        'x-api-key': API_KEY
-                    },
-                    body: JSON.stringify({ vehicle_number: plateNo })
-                });
-                const result = await response.json();
-                if (!result.status) {
-                    throw new Error(result.message || "Record not found.");
+                // First, fetch the form page to get the anti-forgery token
+                const formUrl = 'https://nvis.frsc.gov.ng/vehiclemanagement/verifyplateno';
+                const formResponse = await fetch(formUrl);
+                if (!formResponse.ok) {
+                    throw new Error(`Failed to fetch form page: ${formResponse.statusText}`);
                 }
+                const formHtml = await formResponse.text();
+                const parser = new DOMParser();
+                const formDoc = parser.parseFromString(formHtml, 'text/html');
+                const tokenInput = formDoc.querySelector('input[name="__RequestVerificationToken"]');
+                if (!tokenInput) {
+                    throw new Error('Anti-forgery token not found in form page.');
+                }
+                const token = tokenInput.value;
+
+                // Now, perform the POST request with the token and plate number
+                const postUrl = 'https://nvis.frsc.gov.ng/vehiclemanagement/VerifyPlateNo';
+                const formData = new FormData();
+                formData.append('plateNumber', plateNo);
+                formData.append('__RequestVerificationToken', token);
+
+                const postResponse = await fetch(postUrl, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'  // Include cookies if needed (may require same-origin)
+                });
+                if (!postResponse.ok) {
+                    throw new Error(`Verification failed: ${postResponse.statusText}`);
+                }
+                const resultHtml = await postResponse.text();
+                const resultDoc = parser.parseFromString(resultHtml, 'text/html');
+
+                // Parse the result for vehicle details
+                const panelHeading = resultDoc.querySelector('.panel-heading');
+                if (!panelHeading || !panelHeading.textContent.includes('Valid')) {
+                    throw new Error('Plate not found or invalid.');
+                }
+                const makeTd = resultDoc.querySelector('table tr:nth-child(1) td:nth-child(2) span');
+                const colorTd = resultDoc.querySelector('table tr:nth-child(2) td:nth-child(2) span');
+
+                if (!makeTd || !colorTd) {
+                    throw new Error('Vehicle details not found in response.');
+                }
+
                 activeVehicle = {
                     plate: plateNo,
-                    make: result.data.vehicle_name || 'Unknown',
-                    color: result.data.vehicle_color || 'Unknown'
+                    make: makeTd.textContent.trim(),
+                    color: colorTd.textContent.trim()
                 };
+
                 document.getElementById('detPlate').innerText = activeVehicle.plate;
                 document.getElementById('detMake').innerText = activeVehicle.make;
                 document.getElementById('detColor').innerText = activeVehicle.color;
