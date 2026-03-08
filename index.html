@@ -3,61 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRSC Unit 37BC - Official Portal</title>
+    <title>Plate Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
-        .frsc-bg-red { background-color: #d91e18; }
-        .frsc-light-blue { background-color: #0066cc; }
-        
-        .guilloche-bg {
-            background-color: #ffffff;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%230066cc' fill-opacity='0.03'%3E%3Cpath d='M0 0h80v80H0z'/%3E%3Cpath d='M40 0l40 40-40 40L0 40z'/%3E%3C/g%3E%3C/svg%3E");
-        }
-
-        .watermark {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 8rem;
-            font-weight: 900;
-            color: rgba(0, 102, 204, 0.04);
-            pointer-events: none;
-            white-space: nowrap;
-            text-transform: uppercase;
-            z-index: 0;
-        }
-
-        @media print { .no-print { display: none; } }
     </style>
 </head>
 <body class="min-h-screen">
-
-    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm no-print">
-        <div class="flex items-center space-x-4">
-            <img src="https://frsc.gov.ng/wp-content/uploads/2023/04/frsc-logo.png" alt="FRSC Logo" class="h-12 w-auto" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/e/e4/Federal_Road_Safety_Corps_Logo.png'">
-            <div class="border-l pl-4 border-gray-200">
-                <h1 class="text-xl font-black text-gray-800 tracking-tight">UNIT 37BC</h1>
-                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Federal Road Safety Corps Nigeria</p>
-            </div>
-        </div>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Coat_of_arms_of_Nigeria.svg" alt="Coat of Arms" class="h-12 w-auto">
-    </nav>
-
     <main class="max-w-4xl mx-auto p-6 md:p-12">
-        
         <!-- Input & Verification Section -->
-        <div id="lookupSection" class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 no-print mb-12">
+        <div id="lookupSection" class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 mb-12">
             <div class="mb-8 text-center">
-                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Live Plate Verification</h2>
-                <p class="text-sm text-gray-500">Official FRSC National Vehicle Identification System (NVIS)</p>
+                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Plate Verification</h2>
             </div>
-
             <div class="max-w-xl mx-auto space-y-6">
                 <div>
                     <label class="block text-xs font-black text-gray-500 uppercase mb-2 tracking-wider">Vehicle Plate Number</label>
@@ -66,7 +26,7 @@
                             <i class="fa fa-car text-gray-400"></i>
                         </div>
                         <input type="text" id="plateNumber" placeholder="KUJ823BW" class="flex-1 px-4 py-4 outline-none uppercase font-mono font-bold text-lg">
-                        <button onclick="performRealLookup()" id="verifyBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 font-black uppercase text-xs tracking-widest transition-colors">
+                        <button onclick="performLookup()" id="verifyBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 font-black uppercase text-xs tracking-widest transition-colors">
                             <span id="btnText">Verify</span>
                             <i id="loadingSpinner" class="fa fa-spinner fa-spin hidden"></i>
                         </button>
@@ -74,252 +34,74 @@
                     <!-- Error Message -->
                     <div id="errorMsg" class="hidden mt-4 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-bold flex items-center">
                         <i class="fa fa-exclamation-triangle mr-2"></i>
-                        <span id="errorText">Plate not found in registry.</span>
+                        <span id="errorText">Plate not found.</span>
                     </div>
                 </div>
-
-                <div id="offenceDiv" class="hidden animate-in fade-in slide-in-from-top-4 duration-500">
-                    <label class="block text-xs font-black text-gray-500 uppercase mb-2 tracking-wider">Nature of Offence</label>
-                    <select id="offence" class="w-full px-4 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none transition-all font-bold text-gray-700 appearance-none cursor-pointer">
-                        <option value="15000">Speeding (SPV) - ₦15,000</option>
-                        <option value="10000">Seatbelt Violation (SBV) - ₦10,000</option>
-                        <option value="25000">Dangerous Driving (DND) - ₦25,000</option>
-                        <option value="50000">Drunk Driving (DUI) - ₦50,000</option>
-                        <option value="5000">Light Sign Violation (LSV) - ₦5,000</option>
-                    </select>
-                    <button onclick="generateTicket()" class="w-full mt-4 frsc-bg-red text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-red-100 hover:scale-[1.02] active:scale-95 transition-all">
-                        Generate Enforcement Ticket
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ticket Result -->
-        <div id="ticketContainer" class="hidden">
-            <div id="captureArea" class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200 max-w-2xl mx-auto relative guilloche-bg">
-                <div class="watermark">FEDERAL ROAD SAFETY</div>
-                
-                <div class="frsc-light-blue p-6 text-white flex justify-between items-start relative z-10">
-                    <div class="flex items-center space-x-4">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Coat_of_arms_of_Nigeria.svg" class="h-16 w-auto drop-shadow-lg" alt="Coat of Arms">
-                        <div class="border-l border-white/30 pl-4">
-                            <h2 class="text-lg font-black tracking-tighter leading-none uppercase">Federal Road Safety Commission</h2>
-                            <p class="text-[9px] font-bold opacity-90 mt-1 uppercase tracking-widest">Unit 37BC Enforcement Office • Nigeria</p>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[8px] font-black uppercase opacity-70">Notice Number</p>
-                        <p class="text-lg font-mono font-bold" id="resTicketId">#---</p>
+                <!-- Vehicle Details -->
+                <div id="vehicleDetails" class="hidden animate-in fade-in slide-in-from-top-4 duration-500 mt-6 p-4 bg-gray-50 rounded-2xl">
+                    <h3 class="text-sm font-black text-gray-800 uppercase mb-4">Vehicle Details</h3>
+                    <div class="space-y-2 text-sm">
+                        <p><span class="font-bold">Plate:</span> <span id="detPlate"></span></p>
+                        <p><span class="font-bold">Make & Model:</span> <span id="detMake"></span></p>
+                        <p><span class="font-bold">Color:</span> <span id="detColor"></span></p>
                     </div>
                 </div>
-
-                <div class="p-8 relative z-10">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-1">Notice of Violation</h3>
-                            <p class="text-xs text-gray-500 font-medium" id="resDate">--/--/----</p>
-                        </div>
-                        <div id="qrcode" class="bg-white p-2 border border-gray-100 shadow-sm rounded-lg"></div>
-                    </div>
-
-                    <table class="w-full border-collapse rounded-xl overflow-hidden border border-gray-200 bg-white/80 backdrop-blur-sm mb-6">
-                        <tr class="border-b border-gray-100">
-                            <td class="bg-blue-50/50 p-4 text-[10px] font-black text-blue-800 uppercase w-1/3">Plate Number</td>
-                            <td class="p-4 text-sm font-black text-gray-800 uppercase font-mono tracking-widest" id="resPlate">---</td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="bg-blue-50/50 p-4 text-[10px] font-black text-blue-800 uppercase">Make & Model</td>
-                            <td class="p-4 text-sm font-bold text-gray-700 uppercase" id="resMake">---</td>
-                        </tr>
-                        <tr class="border-b border-gray-100">
-                            <td class="bg-blue-50/50 p-4 text-[10px] font-black text-blue-800 uppercase">Vehicle Color</td>
-                            <td class="p-4 text-sm font-bold text-gray-700 uppercase" id="resColor">---</td>
-                        </tr>
-                        <tr>
-                            <td class="bg-blue-50/50 p-4 text-[10px] font-black text-blue-800 uppercase">Status</td>
-                            <td class="p-4 text-sm font-bold text-gray-700 uppercase"><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px]">VERIFIED_ACTIVE</span></td>
-                        </tr>
-                    </table>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
-                        <div class="space-y-3 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
-                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2">Fine Assessment</h3>
-                            <div class="flex justify-between text-xs">
-                                <span class="text-gray-500">Statutory Fine:</span>
-                                <span class="font-bold" id="resBase">₦0.00</span>
-                            </div>
-                            <div class="flex justify-between text-xs text-blue-600">
-                                <span class="font-bold">Early Payment Discount (30%):</span>
-                                <span class="font-black" id="resDiscount">-₦0.00</span>
-                            </div>
-                            <div class="pt-2 border-t border-dashed border-gray-200">
-                                <p class="text-[8px] text-gray-400 font-black uppercase">Final Payable Amount</p>
-                                <p class="text-3xl font-black text-blue-900 tracking-tighter" id="resTotal">₦0.00</p>
-                            </div>
-                        </div>
-
-                        <div class="bg-blue-900 p-5 rounded-2xl text-white shadow-lg relative overflow-hidden">
-                            <div class="relative z-10">
-                                <h3 class="text-[9px] font-black text-blue-300 uppercase mb-3">TSA Payment Account</h3>
-                                <p class="text-[10px] font-bold opacity-60 uppercase mb-1">Remita TSA Portal</p>
-                                <p class="text-xl font-mono font-bold tracking-widest mb-2" id="resAccount">---</p>
-                                <p class="text-[9px] font-black text-blue-100 uppercase">Beneficiary: FRSC-FEDERAL-REV</p>
-                            </div>
-                            <i class="fa fa-university absolute -bottom-4 -right-4 text-6xl text-white/10"></i>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-8">
-                        <h4 class="text-[9px] font-black text-gray-800 uppercase mb-2">Legal Notice & Instructions</h4>
-                        <div class="grid grid-cols-2 gap-4 text-[8px] text-gray-600 leading-tight uppercase font-bold">
-                            <p>• 30% discount applied for payments within 60 minutes.</p>
-                            <p>• Verification linked to NVIS live database.</p>
-                            <p>• Impoundment applies if fine is not cleared within 24hrs.</p>
-                            <p>• Pay via RRR on the official Remita platform.</p>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-between items-end pt-6 border-t border-gray-200">
-                        <div class="text-center">
-                            <p class="text-[8px] font-black text-blue-800 mb-8 underline italic">OFFICER_37BC_DIGITAL</p>
-                            <p class="text-[8px] font-black text-gray-400 uppercase">Issuing Officer</p>
-                        </div>
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Federal_Road_Safety_Corps_Logo.png" class="h-10 w-auto opacity-10 grayscale" alt="FRSC Logo">
-                        <div class="text-center">
-                            <div class="w-32 h-px bg-gray-300 mb-1"></div>
-                            <p class="text-[8px] font-black text-gray-400 uppercase">Offender Signature</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 flex justify-center space-x-4 no-print">
-                <button onclick="downloadTicket()" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center shadow-lg">
-                    <i class="fa fa-download mr-2"></i> Save Official PNG
-                </button>
-                <button onclick="window.print()" class="bg-white text-gray-800 border border-gray-200 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center shadow-lg">
-                    <i class="fa fa-print mr-2"></i> Print PDF
-                </button>
             </div>
         </div>
     </main>
-
     <script>
         let activeVehicle = null;
-
-        /**
-         * Real-World Lookup Implementation
-         * Connects to the FRSC NVIS public verification endpoint via Proxy
-         */
-        async function performRealLookup() {
+        async function performLookup() {
             const rawInput = document.getElementById('plateNumber').value.trim();
-            const plateNo = rawInput.toUpperCase().replace(/[-\s]/g, ""); 
-            
+            const plateNo = rawInput.toUpperCase().replace(/[-\s]/g, "");
+           
             const btn = document.getElementById('verifyBtn');
             const spinner = document.getElementById('loadingSpinner');
             const text = document.getElementById('btnText');
             const errorDiv = document.getElementById('errorMsg');
-            const offenceDiv = document.getElementById('offenceDiv');
-
+            const detailsDiv = document.getElementById('vehicleDetails');
             errorDiv.classList.add('hidden');
-            offenceDiv.classList.add('hidden');
-            document.getElementById('ticketContainer').classList.add('hidden');
-
+            detailsDiv.classList.add('hidden');
             if(!plateNo || plateNo.length < 5) {
-                showError("Please enter a valid 8-digit plate number.");
+                showError("Please enter a valid plate number.");
                 return;
             }
-
             btn.disabled = true;
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
-
             try {
-                const formData = new FormData();
-                formData.append('plateNumber', plateNo);
-
-                // Note: CORS restrictions apply here. Mocking the successful response for sandbox environment.
-                await new Promise(r => setTimeout(r, 2000));
-
-                if (plateNo === "KUJ823BW" || plateNo === "RSH220AZ" || plateNo === "ABC123DE") {
-                    const registry = {
-                        "KUJ823BW": { make: "HONDA CIVIC", color: "METALLIC BLUE", owner: "SULEIMAN ABBA" },
-                        "RSH220AZ": { make: "TOYOTA COROLLA SAL", color: "GREEN", owner: "ADAMU YUSUF" },
-                        "ABC123DE": { make: "HONDA ACCORD", color: "SILVER", owner: "CHINEDU OKORO" }
-                    };
-                    
+                await new Promise(r => setTimeout(r, 1000)); // Simulate delay
+                const registry = {
+                    "KUJ823BW": { make: "HONDA CIVIC", color: "METALLIC BLUE" },
+                    "RSH220AZ": { make: "TOYOTA COROLLA SAL", color: "GREEN" },
+                    "ABC123DE": { make: "HONDA ACCORD", color: "SILVER" }
+                };
+               
+                if (registry[plateNo]) {
                     activeVehicle = {
                         plate: plateNo,
                         ...registry[plateNo]
                     };
-                    
-                    offenceDiv.classList.remove('hidden');
-                    offenceDiv.scrollIntoView({ behavior: 'smooth' });
+                    document.getElementById('detPlate').innerText = activeVehicle.plate;
+                    document.getElementById('detMake').innerText = activeVehicle.make;
+                    document.getElementById('detColor').innerText = activeVehicle.color;
+                    detailsDiv.classList.remove('hidden');
+                    detailsDiv.scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    throw new Error("Invalid Plate Number: Record not found in National Vehicle Identification System (NVIS).");
+                    throw new Error("Record not found.");
                 }
-
             } catch (err) {
-                showError(err.message || "Unable to connect to FRSC Registry. Check connection.");
+                showError(err.message || "Unable to find record.");
             } finally {
                 btn.disabled = false;
                 spinner.classList.add('hidden');
                 text.classList.remove('hidden');
             }
         }
-
         function showError(msg) {
             const errorDiv = document.getElementById('errorMsg');
             document.getElementById('errorText').innerText = msg;
             errorDiv.classList.remove('hidden');
-        }
-
-        function generateTicket() {
-            if(!activeVehicle) return;
-
-            const baseFine = parseFloat(document.getElementById('offence').value);
-            const discount = baseFine * 0.30;
-            const total = baseFine - discount;
-            const ticketId = `FRSC-37BC-${Math.floor(1000000 + Math.random() * 9000000)}`;
-            const accountNo = `RRR-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-            document.getElementById('resPlate').innerText = activeVehicle.plate;
-            document.getElementById('resMake').innerText = activeVehicle.make;
-            document.getElementById('resColor').innerText = activeVehicle.color;
-            
-            document.getElementById('resBase').innerText = `₦${baseFine.toLocaleString()}`;
-            document.getElementById('resDiscount').innerText = `-₦${discount.toLocaleString()}`;
-            document.getElementById('resTotal').innerText = `₦${total.toLocaleString()}`;
-            document.getElementById('resAccount').innerText = accountNo;
-            document.getElementById('resTicketId').innerText = `#${ticketId}`;
-            document.getElementById('resDate').innerText = new Date().toLocaleString('en-NG');
-
-            const qrContainer = document.getElementById("qrcode");
-            qrContainer.innerHTML = "";
-            new QRCode(qrContainer, {
-                text: `FRSC:VERIFY:${ticketId}:${activeVehicle.plate}`,
-                width: 70,
-                height: 70,
-                colorDark : "#003087",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-
-            document.getElementById('ticketContainer').classList.remove('hidden');
-            document.getElementById('ticketContainer').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        async function downloadTicket() {
-            const area = document.getElementById('captureArea');
-            try {
-                const canvas = await html2canvas(area, { scale: 3, useCORS: true });
-                const link = document.createElement('a');
-                link.download = `FRSC-NOTICE-${activeVehicle.plate}.png`;
-                link.href = canvas.toDataURL("image/png");
-                link.click();
-            } catch (err) {
-                showError("Capture failed. Use Print PDF.");
-            }
         }
     </script>
 </body>
