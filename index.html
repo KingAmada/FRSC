@@ -51,6 +51,11 @@
     </main>
     <script>
         let activeVehicle = null;
+        // Replace with your actual credentials from IdentityPass (signup at https://developer.myidentitypass.com/)
+        const API_URL = 'https://api.myidentitypay.com/api/v2/biometrics/merchant/data/verification/vehicle';
+        const APP_ID = 'YOUR_APP_ID_HERE';
+        const API_KEY = 'YOUR_API_KEY_HERE';
+
         async function performLookup() {
             const rawInput = document.getElementById('plateNumber').value.trim();
             const plateNo = rawInput.toUpperCase().replace(/[-\s]/g, "");
@@ -70,26 +75,29 @@
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
             try {
-                await new Promise(r => setTimeout(r, 1000)); // Simulate delay
-                const registry = {
-                    "KUJ823BW": { make: "HONDA CIVIC", color: "METALLIC BLUE" },
-                    "RSH220AZ": { make: "TOYOTA COROLLA SAL", color: "GREEN" },
-                    "ABC123DE": { make: "HONDA ACCORD", color: "SILVER" }
-                };
-               
-                if (registry[plateNo]) {
-                    activeVehicle = {
-                        plate: plateNo,
-                        ...registry[plateNo]
-                    };
-                    document.getElementById('detPlate').innerText = activeVehicle.plate;
-                    document.getElementById('detMake').innerText = activeVehicle.make;
-                    document.getElementById('detColor').innerText = activeVehicle.color;
-                    detailsDiv.classList.remove('hidden');
-                    detailsDiv.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                    throw new Error("Record not found.");
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'app-id': APP_ID,
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify({ vehicle_number: plateNo })
+                });
+                const result = await response.json();
+                if (!result.status) {
+                    throw new Error(result.message || "Record not found.");
                 }
+                activeVehicle = {
+                    plate: plateNo,
+                    make: result.data.vehicle_name || 'Unknown',
+                    color: result.data.vehicle_color || 'Unknown'
+                };
+                document.getElementById('detPlate').innerText = activeVehicle.plate;
+                document.getElementById('detMake').innerText = activeVehicle.make;
+                document.getElementById('detColor').innerText = activeVehicle.color;
+                detailsDiv.classList.remove('hidden');
+                detailsDiv.scrollIntoView({ behavior: 'smooth' });
             } catch (err) {
                 showError(err.message || "Unable to find record.");
             } finally {
