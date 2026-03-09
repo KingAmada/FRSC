@@ -43,7 +43,9 @@
                     <h3 class="text-sm font-black text-gray-800 uppercase mb-4">Vehicle Details</h3>
                     <div class="space-y-2 text-sm">
                         <p><span class="font-bold">Plate:</span> <span id="detPlate"></span></p>
-                        <p><span class="font-bold">Make & Model:</span> <span id="detMake"></span></p>
+                        <p><span class="font-bold">Make:</span> <span id="detMake"></span></p>
+                        <p><span class="font-bold">Model:</span> <span id="detModel"></span></p>
+                        <p><span class="font-bold">Type:</span> <span id="detType"></span></p>
                         <p><span class="font-bold">Color:</span> <span id="detColor"></span></p>
                         <p><span class="font-bold">Status:</span> <span id="detStatus"></span></p>
                     </div>
@@ -72,79 +74,56 @@
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
             try {
-                // Use a public CORS proxy to bypass browser restrictions
-                // Note: This is for testing; for production, set up your own proxy server
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                // Use cors-anywhere proxy to bypass CORS
+                // IMPORTANT: Visit https://cors-anywhere.herokuapp.com/corsdemo FIRST to request temporary access!
+                // This proxy requires manual activation for your browser session.
+                const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
                 
-                // First, fetch the form page to get the anti-forgery token
-                const formUrl = proxyUrl + encodeURIComponent('https://nvis.frsc.gov.ng/vehiclemanagement/verifyplateno');
-                const formResponse = await fetch(formUrl);
-                if (!formResponse.ok) {
-                    throw new Error(`Failed to fetch form page: ${formResponse.statusText}. The proxy or site may be down.`);
-                }
-                const formHtml = await formResponse.text();
-                const parser = new DOMParser();
-                const formDoc = parser.parseFromString(formHtml, 'text/html');
-                const tokenInput = formDoc.querySelector('input[name="__RequestVerificationToken"]');
-                if (!tokenInput) {
-                    throw new Error('Anti-forgery token not found. The site structure may have changed.');
-                }
-                const token = tokenInput.value;
-
-                // Now, prepare the POST request with the token and plate number
-                const postUrl = 'https://nvis.frsc.gov.ng/vehiclemanagement/VerifyPlateNo';
+                // Perform the POST request
+                const postUrl = proxyUrl + 'https://selfservice.fctevreg.com/router.php';
                 const formData = new FormData();
-                formData.append('plateNumber', plateNo);
-                formData.append('__RequestVerificationToken', token);
+                formData.append('op', 'SelfServiceResource.getVehicleDocument');
+                formData.append('handler', 'SelfServiceResource');
+                formData.append('verify', 'number_plate');
+                formData.append('plate_no', plateNo);
+                formData.append('type', 'genuine');  // Change to 'valid', 'roadWorthy', or 'insurance' as needed
 
-                // Proxy the POST request (allorigins supports GET for proxied content, but for POST we need to adjust)
-                // Note: allorigins.win doesn't natively support POST; for full functionality, use a custom proxy.
-                // As a workaround, we'll use cors-anywhere for POST if needed, but it may require visiting https://cors-anywhere.herokuapp.com/corsdemo first.
-                const postProxyUrl = 'https://cors-anywhere.herokuapp.com/' + postUrl;
-                const postResponse = await fetch(postProxyUrl, {
+                const postResponse = await fetch(postUrl, {
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'  // Sometimes needed for proxies
+                        'X-Requested-With': 'XMLHttpRequest'  // Required for cors-anywhere
                     }
                 });
                 if (!postResponse.ok) {
-                    throw new Error(`Verification failed: ${postResponse.statusText}. Try visiting https://cors-anywhere.herokuapp.com/corsdemo to enable temporary access.`);
+                    throw new Error(`Verification failed: ${postResponse.statusText}. Check proxy activation.`);
                 }
-                const resultHtml = await postResponse.text();
-                const resultDoc = parser.parseFromString(resultHtml, 'text/html');
+                const resultJson = await postResponse.json();
 
-                // Parse the result for vehicle details
-                const panelHeading = resultDoc.querySelector('.panel-heading');
-                if (!panelHeading) {
-                    throw new Error('Invalid response format. Plate may not be found.');
-                }
-                const status = panelHeading.textContent.trim();
-                if (!status.includes('Valid')) {
-                    throw new Error(status || 'Plate not found or invalid.');
-                }
-                const makeTd = resultDoc.querySelector('table tr:nth-child(1) td:nth-child(2) span');
-                const colorTd = resultDoc.querySelector('table tr:nth-child(2) td:nth-child(2) span');
-
-                if (!makeTd || !colorTd) {
-                    throw new Error('Vehicle details not found in response. Site may have changed.');
+                // Parse the JSON response
+                if (resultJson.status !== 102 || resultJson.Genuine !== 'GENUINE') {
+                    throw new Error('Plate not found or invalid.');
                 }
 
                 activeVehicle = {
                     plate: plateNo,
-                    make: makeTd.textContent.trim(),
-                    color: colorTd.textContent.trim(),
-                    status: status
+                    make: resultJson.Make || 'N/A',
+                    model: resultJson.Model || 'N/A',
+                    type: resultJson.Type || 'N/A',
+                    color: resultJson.Colour || 'N/A',
+                    status: resultJson.Genuine
                 };
 
                 document.getElementById('detPlate').innerText = activeVehicle.plate;
                 document.getElementById('detMake').innerText = activeVehicle.make;
+                document.getElementById('detModel').innerText = activeVehicle.model;
+                document.getElementById('detType').innerText = activeVehicle.type;
                 document.getElementById('detColor').innerText = activeVehicle.color;
                 document.getElementById('detStatus').innerText = activeVehicle.status;
                 detailsDiv.classList.remove('hidden');
                 detailsDiv.scrollIntoView({ behavior: 'smooth' });
             } catch (err) {
-                showError(err.message || "Unable to retrieve record. Check console for details.");
+                showError(err.message || "Unable to retrieve record. Check console for details and ensure proxy is activated.");
                 console.error(err);
             } finally {
                 btn.disabled = false;
