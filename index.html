@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Verification Tool</title>
+    <title>Integrated Plate Verification Tool (FRSC & DRTS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <style>
@@ -16,8 +16,8 @@
         <!-- Input & Verification Section -->
         <div id="lookupSection" class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 mb-12">
             <div class="mb-8 text-center">
-                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Vehicle Plate Verification</h2>
-                <p class="text-sm text-gray-500 mt-2">Enter a Nigerian vehicle plate number to look up details.</p>
+                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Integrated Vehicle Plate Verification (FRSC & DRTS)</h2>
+                <p class="text-sm text-gray-500 mt-2">Enter a Nigerian vehicle plate number to look up details from both FRSC and DRTS.</p>
             </div>
             <div class="max-w-xl mx-auto space-y-6">
                 <div>
@@ -40,14 +40,16 @@
                 </div>
                 <!-- Vehicle Details -->
                 <div id="vehicleDetails" class="hidden animate-in fade-in slide-in-from-top-4 duration-500 mt-6 p-4 bg-gray-50 rounded-2xl">
-                    <h3 class="text-sm font-black text-gray-800 uppercase mb-4">Vehicle Details</h3>
-                    <div class="space-y-2 text-sm">
-                        <p><span class="font-bold">Plate:</span> <span id="detPlate"></span></p>
-                        <p><span class="font-bold">Make:</span> <span id="detMake"></span></p>
-                        <p><span class="font-bold">Model:</span> <span id="detModel"></span></p>
-                        <p><span class="font-bold">Type:</span> <span id="detType"></span></p>
-                        <p><span class="font-bold">Color:</span> <span id="detColor"></span></p>
-                        <p><span class="font-bold">Status:</span> <span id="detStatus"></span></p>
+                    <h3 class="text-sm font-black text-gray-800 uppercase mb-4">Integrated Vehicle Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 bg-white rounded-lg shadow">
+                            <h4 class="text-xs font-bold uppercase text-blue-600 mb-2">FRSC Details</h4>
+                            <div id="frscDetails" class="space-y-2 text-sm"></div>
+                        </div>
+                        <div class="p-4 bg-white rounded-lg shadow">
+                            <h4 class="text-xs font-bold uppercase text-green-600 mb-2">DRTS Details</h4>
+                            <div id="drtsDetails" class="space-y-2 text-sm"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -73,55 +75,148 @@
             btn.disabled = true;
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
+
+            let frscData = {};
+            let drtsData = {};
+            let errors = [];
+
             try {
                 // Use cors-anywhere proxy to bypass CORS
                 // IMPORTANT: Visit https://cors-anywhere.herokuapp.com/corsdemo FIRST to request temporary access!
-                // This proxy requires manual activation for your browser session.
                 const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                
-                // Perform the POST request
-                const postUrl = proxyUrl + 'https://selfservice.fctevreg.com/router.php';
-                const formData = new FormData();
-                formData.append('op', 'SelfServiceResource.getVehicleDocument');
-                formData.append('handler', 'SelfServiceResource');
-                formData.append('verify', 'number_plate');
-                formData.append('plate_no', plateNo);
-                formData.append('type', 'genuine');  // Change to 'valid', 'roadWorthy', or 'insurance' as needed
 
-                const postResponse = await fetch(postUrl, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'  // Required for cors-anywhere
+                // DRTS API Integration (JSON-based)
+                try {
+                    const drtsPostUrl = proxyUrl + 'https://selfservice.fctevreg.com/router.php';
+                    const drtsFormData = new FormData();
+                    drtsFormData.append('op', 'SelfServiceResource.getVehicleDocument');
+                    drtsFormData.append('handler', 'SelfServiceResource');
+                    drtsFormData.append('verify', 'number_plate');
+                    drtsFormData.append('plate_no', plateNo);
+                    drtsFormData.append('type', 'genuine');  // Using 'genuine' as per example
+
+                    const drtsResponse = await fetch(drtsPostUrl, {
+                        method: 'POST',
+                        body: drtsFormData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!drtsResponse.ok) {
+                        throw new Error(`DRTS Verification failed: ${drtsResponse.statusText}`);
                     }
-                });
-                if (!postResponse.ok) {
-                    throw new Error(`Verification failed: ${postResponse.statusText}. Check proxy activation.`);
+                    const drtsJson = await drtsResponse.json();
+
+                    if (drtsJson.status !== 102 || drtsJson.Genuine !== 'GENUINE') {
+                        throw new Error('DRTS: Plate not found or invalid.');
+                    }
+
+                    drtsData = {
+                        plate: plateNo,
+                        make: drtsJson.Make || 'N/A',
+                        model: drtsJson.Model || 'N/A',
+                        type: drtsJson.Type || 'N/A',
+                        color: drtsJson.Colour || 'N/A',
+                        status: drtsJson.Genuine
+                    };
+                } catch (drtsErr) {
+                    errors.push(`DRTS Error: ${drtsErr.message}`);
                 }
-                const resultJson = await postResponse.json();
 
-                // Parse the JSON response
-                if (resultJson.status !== 102 || resultJson.Genuine !== 'GENUINE') {
-                    throw new Error('Plate not found or invalid.');
+                // FRSC API Integration (HTML scraping)
+                try {
+                    // Fetch the form page to get the anti-forgery token
+                    const frscFormUrl = proxyUrl + 'https://nvis.frsc.gov.ng/vehiclemanagement/verifyplateno';
+                    const frscFormResponse = await fetch(frscFormUrl, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!frscFormResponse.ok) {
+                        throw new Error(`FRSC Failed to fetch form page: ${frscFormResponse.statusText}`);
+                    }
+                    const frscFormHtml = await frscFormResponse.text();
+                    const parser = new DOMParser();
+                    const frscFormDoc = parser.parseFromString(frscFormHtml, 'text/html');
+                    const tokenInput = frscFormDoc.querySelector('input[name="__RequestVerificationToken"]');
+                    if (!tokenInput) {
+                        throw new Error('FRSC Anti-forgery token not found.');
+                    }
+                    const token = tokenInput.value;
+
+                    // Now, perform the POST request
+                    const frscPostUrl = proxyUrl + 'https://nvis.frsc.gov.ng/vehiclemanagement/VerifyPlateNo';
+                    const frscFormData = new FormData();
+                    frscFormData.append('plateNumber', plateNo);
+                    frscFormData.append('__RequestVerificationToken', token);
+
+                    const frscPostResponse = await fetch(frscPostUrl, {
+                        method: 'POST',
+                        body: frscFormData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!frscPostResponse.ok) {
+                        throw new Error(`FRSC Verification failed: ${frscPostResponse.statusText}`);
+                    }
+                    const frscResultHtml = await frscPostResponse.text();
+                    const frscResultDoc = parser.parseFromString(frscResultHtml, 'text/html');
+
+                    // Parse the result
+                    const panelHeading = frscResultDoc.querySelector('.panel-heading');
+                    if (!panelHeading || !panelHeading.textContent.includes('Valid')) {
+                        throw new Error('FRSC: Plate not found or invalid.');
+                    }
+                    const makeTd = frscResultDoc.querySelector('table tr:nth-child(1) td:nth-child(2) span');
+                    const colorTd = frscResultDoc.querySelector('table tr:nth-child(2) td:nth-child(2) span');
+
+                    if (!makeTd || !colorTd) {
+                        throw new Error('FRSC: Vehicle details not found in response.');
+                    }
+
+                    frscData = {
+                        plate: plateNo,
+                        make: makeTd.textContent.trim().split(' ')[0] || 'N/A',  // e.g., DONGFENG
+                        model: makeTd.textContent.trim().split(' ')[1] || 'N/A',  // e.g., AEOLUS
+                        color: colorTd.textContent.trim() || 'N/A',
+                        status: panelHeading.textContent.trim()
+                    };
+                } catch (frscErr) {
+                    errors.push(`FRSC Error: ${frscErr.message}`);
                 }
 
-                activeVehicle = {
-                    plate: plateNo,
-                    make: resultJson.Make || 'N/A',
-                    model: resultJson.Model || 'N/A',
-                    type: resultJson.Type || 'N/A',
-                    color: resultJson.Colour || 'N/A',
-                    status: resultJson.Genuine
-                };
+                // If both failed, throw error
+                if (Object.keys(frscData).length === 0 && Object.keys(drtsData).length === 0) {
+                    throw new Error('No data retrieved from either FRSC or DRTS.');
+                }
 
-                document.getElementById('detPlate').innerText = activeVehicle.plate;
-                document.getElementById('detMake').innerText = activeVehicle.make;
-                document.getElementById('detModel').innerText = activeVehicle.model;
-                document.getElementById('detType').innerText = activeVehicle.type;
-                document.getElementById('detColor').innerText = activeVehicle.color;
-                document.getElementById('detStatus').innerText = activeVehicle.status;
+                // Display integrated details
+                const frscHtml = `
+                    <p><span class="font-bold">Plate:</span> ${frscData.plate || 'N/A'}</p>
+                    <p><span class="font-bold">Make:</span> ${frscData.make || 'N/A'}</p>
+                    <p><span class="font-bold">Model:</span> ${frscData.model || 'N/A'}</p>
+                    <p><span class="font-bold">Color:</span> ${frscData.color || 'N/A'}</p>
+                    <p><span class="font-bold">Status:</span> ${frscData.status || 'N/A'}</p>
+                `;
+                document.getElementById('frscDetails').innerHTML = frscHtml;
+
+                const drtsHtml = `
+                    <p><span class="font-bold">Plate:</span> ${drtsData.plate || 'N/A'}</p>
+                    <p><span class="font-bold">Make:</span> ${drtsData.make || 'N/A'}</p>
+                    <p><span class="font-bold">Model:</span> ${drtsData.model || 'N/A'}</p>
+                    <p><span class="font-bold">Type:</span> ${drtsData.type || 'N/A'}</p>
+                    <p><span class="font-bold">Color:</span> ${drtsData.color || 'N/A'}</p>
+                    <p><span class="font-bold">Status:</span> ${drtsData.status || 'N/A'}</p>
+                `;
+                document.getElementById('drtsDetails').innerHTML = drtsHtml;
+
                 detailsDiv.classList.remove('hidden');
                 detailsDiv.scrollIntoView({ behavior: 'smooth' });
+
+                if (errors.length > 0) {
+                    showError(errors.join(' | '));
+                }
             } catch (err) {
                 showError(err.message || "Unable to retrieve record. Check console for details and ensure proxy is activated.");
                 console.error(err);
