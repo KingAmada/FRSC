@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plate Verification</title>
+    <title>Plate Verification Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <style>
@@ -16,7 +16,8 @@
         <!-- Input & Verification Section -->
         <div id="lookupSection" class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 mb-12">
             <div class="mb-8 text-center">
-                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Plate Verification</h2>
+                <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Vehicle Plate Verification</h2>
+                <p class="text-sm text-gray-500 mt-2">Enter a Nigerian vehicle plate number to look up details.</p>
             </div>
             <div class="max-w-xl mx-auto space-y-6">
                 <div>
@@ -25,7 +26,7 @@
                         <div class="bg-gray-100 px-4 flex items-center border-r border-gray-200">
                             <i class="fa fa-car text-gray-400"></i>
                         </div>
-                        <input type="text" id="plateNumber" placeholder="KUJ823BW" class="flex-1 px-4 py-4 outline-none uppercase font-mono font-bold text-lg">
+                        <input type="text" id="plateNumber" placeholder="KUJ575EP" class="flex-1 px-4 py-4 outline-none uppercase font-mono font-bold text-lg">
                         <button onclick="performLookup()" id="verifyBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 font-black uppercase text-xs tracking-widest transition-colors">
                             <span id="btnText">Verify</span>
                             <i id="loadingSpinner" class="fa fa-spinner fa-spin hidden"></i>
@@ -44,6 +45,7 @@
                         <p><span class="font-bold">Plate:</span> <span id="detPlate"></span></p>
                         <p><span class="font-bold">Make & Model:</span> <span id="detMake"></span></p>
                         <p><span class="font-bold">Color:</span> <span id="detColor"></span></p>
+                        <p><span class="font-bold">Status:</span> <span id="detStatus"></span></p>
                     </div>
                 </div>
             </div>
@@ -63,70 +65,87 @@
             errorDiv.classList.add('hidden');
             detailsDiv.classList.add('hidden');
             if(!plateNo || plateNo.length < 5) {
-                showError("Please enter a valid plate number.");
+                showError("Please enter a valid plate number (e.g., KUJ575EP).");
                 return;
             }
             btn.disabled = true;
             spinner.classList.remove('hidden');
             text.classList.add('hidden');
             try {
+                // Use a public CORS proxy to bypass browser restrictions
+                // Note: This is for testing; for production, set up your own proxy server
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                
                 // First, fetch the form page to get the anti-forgery token
-                const formUrl = 'https://nvis.frsc.gov.ng/vehiclemanagement/verifyplateno';
+                const formUrl = proxyUrl + encodeURIComponent('https://nvis.frsc.gov.ng/vehiclemanagement/verifyplateno');
                 const formResponse = await fetch(formUrl);
                 if (!formResponse.ok) {
-                    throw new Error(`Failed to fetch form page: ${formResponse.statusText}`);
+                    throw new Error(`Failed to fetch form page: ${formResponse.statusText}. The proxy or site may be down.`);
                 }
                 const formHtml = await formResponse.text();
                 const parser = new DOMParser();
                 const formDoc = parser.parseFromString(formHtml, 'text/html');
                 const tokenInput = formDoc.querySelector('input[name="__RequestVerificationToken"]');
                 if (!tokenInput) {
-                    throw new Error('Anti-forgery token not found in form page.');
+                    throw new Error('Anti-forgery token not found. The site structure may have changed.');
                 }
                 const token = tokenInput.value;
 
-                // Now, perform the POST request with the token and plate number
+                // Now, prepare the POST request with the token and plate number
                 const postUrl = 'https://nvis.frsc.gov.ng/vehiclemanagement/VerifyPlateNo';
                 const formData = new FormData();
                 formData.append('plateNumber', plateNo);
                 formData.append('__RequestVerificationToken', token);
 
-                const postResponse = await fetch(postUrl, {
+                // Proxy the POST request (allorigins supports GET for proxied content, but for POST we need to adjust)
+                // Note: allorigins.win doesn't natively support POST; for full functionality, use a custom proxy.
+                // As a workaround, we'll use cors-anywhere for POST if needed, but it may require visiting https://cors-anywhere.herokuapp.com/corsdemo first.
+                const postProxyUrl = 'https://cors-anywhere.herokuapp.com/' + postUrl;
+                const postResponse = await fetch(postProxyUrl, {
                     method: 'POST',
                     body: formData,
-                    credentials: 'include'  // Include cookies if needed (may require same-origin)
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'  // Sometimes needed for proxies
+                    }
                 });
                 if (!postResponse.ok) {
-                    throw new Error(`Verification failed: ${postResponse.statusText}`);
+                    throw new Error(`Verification failed: ${postResponse.statusText}. Try visiting https://cors-anywhere.herokuapp.com/corsdemo to enable temporary access.`);
                 }
                 const resultHtml = await postResponse.text();
                 const resultDoc = parser.parseFromString(resultHtml, 'text/html');
 
                 // Parse the result for vehicle details
                 const panelHeading = resultDoc.querySelector('.panel-heading');
-                if (!panelHeading || !panelHeading.textContent.includes('Valid')) {
-                    throw new Error('Plate not found or invalid.');
+                if (!panelHeading) {
+                    throw new Error('Invalid response format. Plate may not be found.');
+                }
+                const status = panelHeading.textContent.trim();
+                if (!status.includes('Valid')) {
+                    throw new Error(status || 'Plate not found or invalid.');
                 }
                 const makeTd = resultDoc.querySelector('table tr:nth-child(1) td:nth-child(2) span');
                 const colorTd = resultDoc.querySelector('table tr:nth-child(2) td:nth-child(2) span');
 
                 if (!makeTd || !colorTd) {
-                    throw new Error('Vehicle details not found in response.');
+                    throw new Error('Vehicle details not found in response. Site may have changed.');
                 }
 
                 activeVehicle = {
                     plate: plateNo,
                     make: makeTd.textContent.trim(),
-                    color: colorTd.textContent.trim()
+                    color: colorTd.textContent.trim(),
+                    status: status
                 };
 
                 document.getElementById('detPlate').innerText = activeVehicle.plate;
                 document.getElementById('detMake').innerText = activeVehicle.make;
                 document.getElementById('detColor').innerText = activeVehicle.color;
+                document.getElementById('detStatus').innerText = activeVehicle.status;
                 detailsDiv.classList.remove('hidden');
                 detailsDiv.scrollIntoView({ behavior: 'smooth' });
             } catch (err) {
-                showError(err.message || "Unable to find record.");
+                showError(err.message || "Unable to retrieve record. Check console for details.");
+                console.error(err);
             } finally {
                 btn.disabled = false;
                 spinner.classList.add('hidden');
